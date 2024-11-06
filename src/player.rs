@@ -15,11 +15,10 @@ pub enum PlayerStatus {
 
 pub struct Player {
     pub name: String,
-    hand: Vec<Card>,
     kind: PlayerKind,
-    bet: u32,
     pot: u32,
     status: PlayerStatus,
+    hands: Vec<Hand>,
 }
 
 pub enum HandCondition {
@@ -36,40 +35,67 @@ pub enum Play {
     Surrender,
 }
 
-impl Player {
-    pub fn new(name: String, bet: u32, kind: PlayerKind) -> Self {
+pub struct Hand {
+    cards: Vec<Card>,
+    splitted: bool,
+    bet: u32,
+}
+
+impl Hand {
+    pub fn new(splitted: bool, bet: u32) -> Self {
         Self {
-            kind,
-            name,
             bet,
-            pot: bet,
-            status: PlayerStatus::Playing,
-            hand: vec![],
+            splitted,
+            cards: vec![],
         }
     }
 
     pub fn add_card_to_hand(&mut self, card: Card) {
-        self.hand.push(card);
+        self.cards.push(card);
     }
 
-    pub fn play(&mut self, deck: &mut Deck) -> &PlayerStatus {
-        match self.kind {
-            PlayerKind::Dealer => self.dealer_play(deck),
-            PlayerKind::Player => self.player_play(deck),
-        };
-        self.check_condition()
+    pub fn double_bet(&mut self) {
+        self.bet *= 2;
     }
 
-    fn sum_hand(&self) -> u8 {
-        self.hand.iter().fold(0, |mut acc, item| {
+    fn sum_value(&self) -> u8 {
+        self.cards.iter().fold(0, |mut acc, item| {
             acc += item.value(acc);
             acc
         })
     }
+}
 
-    fn check_condition(&mut self) -> &PlayerStatus {
+impl Player {
+    pub fn new(name: String, pot: u32, kind: PlayerKind) -> Self {
+        Self {
+            kind,
+            name,
+            pot,
+            status: PlayerStatus::Playing,
+            hands: vec![],
+        }
+    }
+
+    pub fn new_hand(&mut self, bet: u32) {
+        self.hands.push(Hand::new(false, bet));
+    }
+
+    pub fn add_card_to_hand(&mut self, card: Card, current_hand: usize) {
+        self.hands[current_hand].cards.push(card);
+    }
+
+    pub fn play(&mut self, current_hand: usize, deck: &mut Deck) -> &PlayerStatus {
+        match self.kind {
+            PlayerKind::Dealer => self.dealer_play(deck),
+            PlayerKind::Player => self.player_play(current_hand, deck),
+        };
+        self.check_condition(current_hand)
+    }
+
+    fn check_condition(&mut self, current_hand: usize) -> &PlayerStatus {
         if self.status == PlayerStatus::Playing {
-            match self.check_hand() {
+            match self.check_hand(current_hand) {
                 HandCondition::Under => {
                     self.status = PlayerStatus::Playing;
                 }
@@ -84,19 +110,19 @@ impl Player {
         &self.status
     }
 
-    fn check_hand(&self) -> HandCondition {
-        match self.sum_hand() {
+    fn check_hand(&self, current_hand: usize) -> HandCondition {
+        match self.hands[current_hand].sum_value() {
             0..=20 => HandCondition::Under,
             21 => HandCondition::Blackjack,
             _ => HandCondition::Busted,
         }
     }
 
-    fn take_action(&mut self, play: Play, deck: &mut Deck) {
+    fn take_action(&mut self, current_hand: usize, play: Play, deck: &mut Deck) {
         match play {
             Play::Hit => {
                 println!("{}: Hit!", self.name);
-                self.add_card_to_hand(deck.deal_card());
+                self.add_card_to_hand(deck.deal_card(), current_hand);
             }
             Play::Stand => {
                 println!("{}: Stand.", self.name);
@@ -104,11 +130,13 @@ impl Player {
             }
             Play::DoubleDown => {
                 println!("{}: DOUBLE DOWN!", self.name);
-                self.bet *= 2;
-                self.add_card_to_hand(deck.deal_card());
+                self.add_card_to_hand(deck.deal_card(), current_hand);
+                self.hands[current_hand].double_bet();
             }
             Play::Split => {
                 println!("{}: Split!", self.name);
+                self.new_hand(self.hands[current_hand].bet);
+                self.hands.last().unwrap().add_card_to_hand(card);
             }
             Play::Surrender => {
                 println!("{}: I surrender!", self.name);
@@ -117,12 +145,12 @@ impl Player {
         }
     }
 
-    fn player_play(&mut self, deck: &mut Deck) {}
+    fn player_play(&mut self, current_hand: usize, deck: &mut Deck) {}
 
     fn dealer_play(&mut self, deck: &mut Deck) {
-        match self.sum_hand() {
-            0..=16 => self.take_action(Play::Hit, deck),
-            _ => self.take_action(Play::Stand, deck),
+        match self.hands[0].sum_value() {
+            0..=16 => self.take_action(0, Play::Hit, deck),
+            _ => self.take_action(0, Play::Stand, deck),
         }
     }
 }
