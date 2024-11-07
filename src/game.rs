@@ -36,13 +36,15 @@ impl Game {
         println!("Shuffling deck...");
         self.deck.shuffle();
 
-        self.dealer.add_card_to_hand(self.deck.deal_card());
-        for p in self.players.iter_mut() {
-            p.add_card_to_hand(self.deck.deal_card());
+        for i in 0..2 {
+            self.dealer.add_card_to_hand(self.deck.deal_card(), i);
+            for p in self.players.iter_mut() {
+                p.add_card_to_hand(self.deck.deal_card(), i);
+            }
         }
 
         'round: loop {
-            match self.dealer.play(&mut self.deck) {
+            match self.dealer.play(0, &mut self.deck) {
                 PlayerStatus::Won => {
                     println!("The Dealer has won! Better luck next time!");
                     break 'round;
@@ -55,13 +57,15 @@ impl Game {
             };
             let mut must_remove = vec![];
             for p in self.players.iter_mut() {
-                match p.play(&mut self.deck) {
-                    PlayerStatus::Playing => (),
-                    PlayerStatus::Won => {
-                        println!("{} has won this round against the Dealer!", p.name);
-                    }
-                    PlayerStatus::Standing | PlayerStatus::Lost => {
-                        must_remove.push(p.name.clone());
+                for current_hand in 0..p.hands.len() {
+                    match p.play(current_hand, &mut self.deck) {
+                        PlayerStatus::Playing => (),
+                        PlayerStatus::Won => {
+                            println!("{} has won this round against the Dealer!", p.name);
+                        }
+                        PlayerStatus::Standing | PlayerStatus::Lost => {
+                            must_remove.push(p.name.clone());
+                        }
                     }
                 }
             }
@@ -72,11 +76,10 @@ impl Game {
     fn setup_game(&mut self, players_count: u8) {
         self.players = vec![];
         for i in 0..players_count {
-            self.players.push(Player::new(
-                format!("Player {}", i + 1),
-                10,
-                PlayerKind::Player,
-            ));
+            let mut player = Player::new(format!("Player {}", i + 1), 100, PlayerKind::Player);
+            player.new_hand(20, None);
+            self.players.push(player);
         }
+        self.dealer.new_hand(0, None);
     }
 }

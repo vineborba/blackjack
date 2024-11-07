@@ -18,7 +18,7 @@ pub struct Player {
     kind: PlayerKind,
     pot: u32,
     status: PlayerStatus,
-    hands: Vec<Hand>,
+    pub hands: Vec<Hand>,
 }
 
 pub enum HandCondition {
@@ -42,11 +42,15 @@ pub struct Hand {
 }
 
 impl Hand {
-    pub fn new(splitted: bool, bet: u32) -> Self {
+    pub fn new(splitted: bool, bet: u32, first_card: Option<Card>) -> Self {
+        let mut cards = vec![];
+        if let Some(card) = first_card {
+            cards.push(card);
+        }
         Self {
             bet,
             splitted,
-            cards: vec![],
+            cards,
         }
     }
 
@@ -77,8 +81,12 @@ impl Player {
         }
     }
 
-    pub fn new_hand(&mut self, bet: u32) {
-        self.hands.push(Hand::new(false, bet));
+    pub fn new_hand(&mut self, bet: u32, card: Option<Card>) -> Result<(), String> {
+        if bet > self.pot {
+            return Err(format!("{} is betting more than owned pot!", self.name))
+        }
+        self.hands.push(Hand::new(false, bet, card));
+        Ok(())
     }
 
     pub fn add_card_to_hand(&mut self, card: Card, current_hand: usize) {
@@ -132,11 +140,14 @@ impl Player {
                 println!("{}: DOUBLE DOWN!", self.name);
                 self.add_card_to_hand(deck.deal_card(), current_hand);
                 self.hands[current_hand].double_bet();
+                self.status = PlayerStatus::Standing;
             }
             Play::Split => {
                 println!("{}: Split!", self.name);
-                self.new_hand(self.hands[current_hand].bet);
-                self.hands.last().unwrap().add_card_to_hand(card);
+                let card = self.hands[current_hand].cards.pop();
+                self.new_hand(self.hands[current_hand].bet, card);
+                self.add_card_to_hand(deck.deal_card(), current_hand);
+                self.add_card_to_hand(deck.deal_card(), self.hands.len() - 1);
             }
             Play::Surrender => {
                 println!("{}: I surrender!", self.name);

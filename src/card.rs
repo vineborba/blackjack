@@ -48,7 +48,7 @@ impl Figure {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Card {
     #[allow(unused)]
     suit: Suit,

@@ -1,9 +1,0 @@
-loop:
-    1. make bets
-    2. give first card all, dealer not show
-    3. give second card all, dealer show only second
-        3.1 player can split if cards are equal
-        3.2 player can double down
-    4. continue until all finish playing
-    5. determine wins
-
