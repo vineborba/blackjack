@@ -1,5 +1,15 @@
-use crate::{card::Card, deck::Deck};
+use std::{io, str::FromStr};
 
+use strum::IntoEnumIterator;
+
+use crate::{
+    action::Action,
+    card::Card,
+    deck::Deck,
+    hand::{Hand, HandCondition},
+};
+
+#[derive(Debug)]
 pub enum PlayerKind {
     Dealer,
     Player,
@@ -13,61 +23,13 @@ pub enum PlayerStatus {
     Lost,
 }
 
+#[derive(Debug)]
 pub struct Player {
     pub name: String,
     kind: PlayerKind,
     pot: u32,
     status: PlayerStatus,
     pub hands: Vec<Hand>,
-}
-
-pub enum HandCondition {
-    Under,
-    Blackjack,
-    Busted,
-}
-
-pub enum Play {
-    Hit,
-    Stand,
-    DoubleDown,
-    Split,
-    Surrender,
-}
-
-pub struct Hand {
-    cards: Vec<Card>,
-    splitted: bool,
-    bet: u32,
-}
-
-impl Hand {
-    pub fn new(splitted: bool, bet: u32, first_card: Option<Card>) -> Self {
-        let mut cards = vec![];
-        if let Some(card) = first_card {
-            cards.push(card);
-        }
-        Self {
-            bet,
-            splitted,
-            cards,
-        }
-    }
-
-    pub fn add_card_to_hand(&mut self, card: Card) {
-        self.cards.push(card);
-    }
-
-    pub fn double_bet(&mut self) {
-        self.bet *= 2;
-    }
-
-    fn sum_value(&self) -> u8 {
-        self.cards.iter().fold(0, |mut acc, item| {
-            acc += item.value(acc);
-            acc
-        })
-    }
 }
 
 impl Player {
@@ -83,22 +45,26 @@ impl Player {
 
     pub fn new_hand(&mut self, bet: u32, card: Option<Card>) -> Result<(), String> {
         if bet > self.pot {
-            return Err(format!("{} is betting more than owned pot!", self.name))
+            return Err(format!("{} is betting more than owned pot!", self.name));
         }
         self.hands.push(Hand::new(false, bet, card));
         Ok(())
     }
 
     pub fn add_card_to_hand(&mut self, card: Card, current_hand: usize) {
-        self.hands[current_hand].cards.push(card);
+        self.hands[current_hand].add_card_to_hand(card);
     }
 
-    pub fn play(&mut self, current_hand: usize, deck: &mut Deck) -> &PlayerStatus {
+    pub fn play(&mut self, current_hand: usize, deck: &mut Deck) -> Result<&PlayerStatus, String> {
         match self.kind {
-            PlayerKind::Dealer => self.dealer_play(deck),
-            PlayerKind::Player => self.player_play(current_hand, deck),
+            PlayerKind::Dealer => self.dealer_play(deck)?,
+            PlayerKind::Player => self.player_play(current_hand, deck)?,
         };
-        self.check_condition(current_hand)
+        Ok(self.check_condition(current_hand))
+    }
+
+    pub fn still_playing(&self) -> bool {
+        matches!(self.status, PlayerStatus::Playing)
     }
 
     fn check_condition(&mut self, current_hand: usize) -> &PlayerStatus {
@@ -119,49 +85,95 @@ impl Player {
     }
 
     fn check_hand(&self, current_hand: usize) -> HandCondition {
-        match self.hands[current_hand].sum_value() {
-            0..=20 => HandCondition::Under,
-            21 => HandCondition::Blackjack,
-            _ => HandCondition::Busted,
-        }
+        self.hands[current_hand].check_hand()
     }
 
-    fn take_action(&mut self, current_hand: usize, play: Play, deck: &mut Deck) {
-        match play {
-            Play::Hit => {
+    fn execute_action(
+        &mut self,
+        current_hand: usize,
+        action: Action,
+        deck: &mut Deck,
+    ) -> Result<(), String> {
+        match action {
+            Action::Hit => {
                 println!("{}: Hit!", self.name);
-                self.add_card_to_hand(deck.deal_card(), current_hand);
+                let card = deck.deal_card();
+                println!("{} got the card {}", self.name, card);
+                self.add_card_to_hand(card, current_hand);
             }
-            Play::Stand => {
+            Action::Stand => {
                 println!("{}: Stand.", self.name);
                 self.status = PlayerStatus::Standing;
             }
-            Play::DoubleDown => {
+            Action::DoubleDown => {
                 println!("{}: DOUBLE DOWN!", self.name);
                 self.add_card_to_hand(deck.deal_card(), current_hand);
                 self.hands[current_hand].double_bet();
                 self.status = PlayerStatus::Standing;
             }
-            Play::Split => {
+            Action::Split => {
                 println!("{}: Split!", self.name);
-                let card = self.hands[current_hand].cards.pop();
-                self.new_hand(self.hands[current_hand].bet, card);
+                let hand = &mut self.hands[current_hand];
+                let (card, bet) = hand.split();
+                self.new_hand(bet, card)?;
                 self.add_card_to_hand(deck.deal_card(), current_hand);
                 self.add_card_to_hand(deck.deal_card(), self.hands.len() - 1);
             }
-            Play::Surrender => {
+            Action::Surrender => {
                 println!("{}: I surrender!", self.name);
                 self.status = PlayerStatus::Lost;
             }
-        }
+        };
+        Ok(())
     }
 
-    fn player_play(&mut self, current_hand: usize, deck: &mut Deck) {}
-
-    fn dealer_play(&mut self, deck: &mut Deck) {
+    fn dealer_play(&mut self, deck: &mut Deck) -> Result<(), String> {
         match self.hands[0].sum_value() {
-            0..=16 => self.take_action(0, Play::Hit, deck),
-            _ => self.take_action(0, Play::Stand, deck),
-        }
+            0..=16 => self.execute_action(0, Action::Hit, deck)?,
+            _ => self.execute_action(0, Action::Stand, deck)?,
+        };
+        Ok(())
+    }
+
+    fn player_play(&mut self, current_hand: usize, deck: &mut Deck) -> Result<(), String> {
+        let hand = &self.hands[current_hand];
+        let hand_size = hand.size();
+        let hands_count = self.hands.len();
+        let bet = hand.current_bet();
+
+        let possible_actions: Vec<Action> = Action::iter()
+            .filter_map(|action| {
+                if action.can_execute(hand_size, hands_count, self.pot, bet) {
+                    return Some(action);
+                }
+                None
+            })
+            .collect();
+
+        println!("{}", "*".repeat(90));
+
+        println!(
+            "{}, this is your status for your {} hand:\n{}",
+            self.name,
+            current_hand + 1,
+            self.hands[current_hand]
+        );
+        println!();
+
+        println!("What will you do?");
+        Action::print_actions_list(&possible_actions);
+
+        let mut input = String::new();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read from stdin");
+        let input = input.trim();
+
+        let action = Action::from_str(input)?;
+        self.execute_action(current_hand, action, deck)?;
+
+        println!("{}", "*".repeat(90));
+
+        Ok(())
     }
 }
