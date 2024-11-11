@@ -2,7 +2,7 @@ use std::{fmt, str::FromStr};
 
 use strum::EnumIter;
 
-#[derive(Debug, EnumIter)]
+#[derive(Debug, EnumIter, PartialEq, Eq)]
 pub enum Action {
     Hit,
     Stand,
@@ -12,10 +12,17 @@ pub enum Action {
 }
 
 impl Action {
-    pub fn can_execute(&self, hand_size: usize, hands_count: usize, pot: u32, bet: u32) -> bool {
+    pub fn can_execute(
+        &self,
+        hand_size: usize,
+        hands_count: usize,
+        pot: u32,
+        bet: u32,
+        cards_are_equal: bool,
+    ) -> bool {
         match self {
-            Action::DoubleDown => hand_size < 2 && pot >= (bet * hands_count as u32),
-            Action::Split => hand_size == 2 && pot >= (bet * hands_count as u32),
+            Action::DoubleDown => hand_size == 2 && pot >= (bet * hands_count as u32),
+            Action::Split => hand_size == 2 && cards_are_equal && pot >= (bet * hands_count as u32),
             Action::Surrender => hands_count == 1 && hand_size == 2,
             Action::Hit | Action::Stand => true,
         }
@@ -56,5 +63,15 @@ impl FromStr for Action {
             _ => return Err("Invalid input for action".into()),
         };
         Ok(action)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn from_str_conversion() {
+        assert_eq!(Action::Hit, Action::from_str("h").unwrap());
     }
 }

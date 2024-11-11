@@ -107,7 +107,9 @@ impl Player {
             }
             Action::DoubleDown => {
                 println!("{}: DOUBLE DOWN!", self.name);
-                self.add_card_to_hand(deck.deal_card(), current_hand);
+                let card = deck.deal_card();
+                println!("{} got the card {}", self.name, card);
+                self.add_card_to_hand(card, current_hand);
                 self.hands[current_hand].double_bet();
                 self.status = PlayerStatus::Standing;
             }
@@ -116,8 +118,22 @@ impl Player {
                 let hand = &mut self.hands[current_hand];
                 let (card, bet) = hand.split();
                 self.new_hand(bet, card)?;
-                self.add_card_to_hand(deck.deal_card(), current_hand);
-                self.add_card_to_hand(deck.deal_card(), self.hands.len() - 1);
+                let card = deck.deal_card();
+                println!(
+                    "{} got the card {} for their {} hand",
+                    self.name,
+                    card,
+                    current_hand + 1
+                );
+                self.add_card_to_hand(card, current_hand);
+                let card = deck.deal_card();
+                println!(
+                    "{} got the card {} for their {} hand",
+                    self.name,
+                    card,
+                    self.hands.len()
+                );
+                self.add_card_to_hand(card, self.hands.len() - 1);
             }
             Action::Surrender => {
                 println!("{}: I surrender!", self.name);
@@ -140,10 +156,11 @@ impl Player {
         let hand_size = hand.size();
         let hands_count = self.hands.len();
         let bet = hand.current_bet();
+        let cards_are_equal = hand.cards_are_equal();
 
         let possible_actions: Vec<Action> = Action::iter()
             .filter_map(|action| {
-                if action.can_execute(hand_size, hands_count, self.pot, bet) {
+                if action.can_execute(hand_size, hands_count, self.pot, bet, cards_are_equal) {
                     return Some(action);
                 }
                 None

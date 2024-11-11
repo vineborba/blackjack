@@ -63,6 +63,10 @@ impl Hand {
     pub fn current_bet(&self) -> u32 {
         self.bet
     }
+
+    pub fn cards_are_equal(&self) -> bool {
+        self.cards.iter().all(|c| *c == self.cards[0])
+    }
 }
 
 impl fmt::Display for Hand {
@@ -73,6 +77,6 @@ impl fmt::Display for Hand {
             .map(|c| c.to_string())
             .collect::<Vec<String>>()
             .join(", ");
-        write!(f, "bet: {}\ncards: {}", self.bet, string_cards)
+        write!(f, "cards: {}", string_cards)
     }
 }

@@ -103,3 +103,11 @@ impl fmt::Display for Card {
         write!(f, "{}{}", self.figure, self.suit)
     }
 }
+
+impl PartialEq for Card {
+    fn eq(&self, other: &Self) -> bool {
+        self.figure == other.figure
+    }
+}
+
+impl Eq for Card {}
