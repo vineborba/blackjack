@@ -80,3 +80,18 @@ impl fmt::Display for Hand {
         write!(f, "cards: {}", string_cards)
     }
 }
+
+impl PartialEq for Hand {
+    fn eq(&self, other: &Self) -> bool {
+        self.sum_value() == other.sum_value()
+    }
+}
+
+impl PartialOrd for Hand {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let self_value = self.sum_value();
+        let other_value = other.sum_value();
+
+        self_value.partial_cmp(&other_value)
+    }
+}

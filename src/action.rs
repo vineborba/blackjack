@@ -21,8 +21,8 @@ impl Action {
         cards_are_equal: bool,
     ) -> bool {
         match self {
-            Action::DoubleDown => hand_size == 2 && pot >= (bet * hands_count as u32),
-            Action::Split => hand_size == 2 && cards_are_equal && pot >= (bet * hands_count as u32),
+            Action::DoubleDown => hand_size == 2 && pot >= (bet * 2),
+            Action::Split => hand_size == 2 && cards_are_equal && pot >= (bet * 2),
             Action::Surrender => hands_count == 1 && hand_size == 2,
             Action::Hit | Action::Stand => true,
         }
@@ -69,9 +69,24 @@ impl FromStr for Action {
 #[cfg(test)]
 mod test {
     use super::*;
+    use pretty_assertions::assert_eq;
+    use rstest::*;
 
-    #[test]
-    fn from_str_conversion() {
-        assert_eq!(Action::Hit, Action::from_str("h").unwrap());
+    #[rstest]
+    #[case::hit_lowercase("h", Action::Hit)]
+    #[case::hit_uppercase("H", Action::Hit)]
+    #[case::stand_lowercase("s", Action::Stand)]
+    #[case::stand_uppercase("S", Action::Stand)]
+    #[case::double_down_lowercase("d", Action::DoubleDown)]
+    #[case::double_down_uppercase("D", Action::DoubleDown)]
+    #[case::split_lowercase("x", Action::Split)]
+    #[case::split_uppercase("X", Action::Split)]
+    #[case::surrender_lowercase("q", Action::Surrender)]
+    #[case::surrender_uppercase("Q", Action::Surrender)]
+    fn from_str_conversion(#[case] input: &str, #[case] output: Action) {
+        assert_eq!(Action::from_str(input).unwrap(), output);
     }
+
+    #[rstest]
+    fn can_splt() {}
 }

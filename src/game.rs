@@ -1,6 +1,7 @@
 use crate::{
     deck::Deck,
-    player::{Player, PlayerKind, PlayerStatus},
+    hand::HandCondition,
+    player::{Player, PlayerKind},
 };
 
 #[derive(Debug)]
@@ -63,7 +64,7 @@ impl Game {
         }
 
         let mut out = 0;
-        'round: loop {
+        loop {
             if out == 12 {
                 break;
             };
@@ -77,42 +78,24 @@ impl Game {
             println!("{}", "*".repeat(90));
 
             // PLAYERS ACTIONS
-            let mut must_remove = vec![];
-            for p in self.players.iter_mut() {
+            for p in self.players.iter_mut().filter(|p| p.still_playing()) {
                 for current_hand in 0..p.hands.len() {
-                    match p.play(current_hand, &mut self.deck)? {
-                        PlayerStatus::Playing => (),
-                        PlayerStatus::Won => {
-                            println!("{} has won this round against the Dealer!", p.name);
-                        }
-                        PlayerStatus::Standing | PlayerStatus::Lost => {
-                            must_remove.push(p.name.clone());
-                        }
-                    }
+                    p.play(current_hand, &mut self.deck)?;
                 }
             }
-            self.players.retain(|p| !must_remove.contains(&p.name));
 
             // DEALERS ACTIONS
             if self.dealer.still_playing() {
                 println!("The Dealer will play now");
-                match self.dealer.play(0, &mut self.deck)? {
-                    PlayerStatus::Won => {
-                        println!("The Dealer has won! Better luck next time!");
-                        break 'round;
-                    }
-                    PlayerStatus::Lost => {
-                        println!("The Dealer lost! All players won this round!");
-                        break 'round;
-                    }
-                    _ => (),
-                };
+                self.dealer.play(0, &mut self.deck)?;
             }
 
             if self.should_break_loop() {
                 break;
             }
         }
+        println!("Verifying results now");
+        self.verify_results();
         Ok(())
     }
 
@@ -120,5 +103,56 @@ impl Game {
         let players = self.players.iter().all(|p| !p.still_playing());
         let dealer = !self.dealer.still_playing();
         players && dealer
+    }
+
+    fn verify_results(&mut self) {
+        let dealer_hand = self.dealer.check_hand_condition(0);
+        dbg!(&self.players);
+        for p in self.players.iter_mut() {
+            dbg!(2);
+            let single_hand = p.hands.len() == 1;
+            dbg!(3);
+            for (i, h) in p.hands.iter().enumerate() {
+                dbg!(4);
+                let player_hand = h.check_hand();
+                if single_hand {
+                    println!("Comparing {}'s hand with the Dealers'", p.name);
+                } else {
+                    println!("Comparing {}'s {} hand with the Dealers'", p.name, i + 1);
+                }
+                match (&dealer_hand, &player_hand) {
+                    (HandCondition::Under, HandCondition::Under) => {
+                        let dealer_hand = &self.dealer.hands[0];
+                        if dealer_hand > h {
+                            println!("Dealer won");
+                        } else if dealer_hand == h {
+                            println!("Tie!");
+                            p.pot += h.current_bet();
+                        } else {
+                            println!("Player won");
+                            p.pot += 2 * h.current_bet();
+                        }
+                    }
+                    (HandCondition::Blackjack, HandCondition::Blackjack) => {
+                        println!("Tie!");
+                        p.pot += h.current_bet();
+                    }
+                    (HandCondition::Busted, _) => {
+                        println!("Player won");
+                        p.pot += 2 * h.current_bet();
+                    }
+                    (HandCondition::Blackjack, _) => {
+                        println!("Dealer won");
+                    }
+                    (_, HandCondition::Blackjack) => {
+                        println!("Player won");
+                        p.pot += (2.5 * h.current_bet() as f32).ceil() as u32;
+                    }
+                    (_, HandCondition::Busted) => {
+                        println!("Dealer won");
+                    }
+                };
+            }
+        }
     }
 }

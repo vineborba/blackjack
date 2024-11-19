@@ -27,7 +27,7 @@ pub enum PlayerStatus {
 pub struct Player {
     pub name: String,
     kind: PlayerKind,
-    pot: u32,
+    pub pot: u32,
     status: PlayerStatus,
     pub hands: Vec<Hand>,
 }
@@ -47,6 +47,7 @@ impl Player {
         if bet > self.pot {
             return Err(format!("{} is betting more than owned pot!", self.name));
         }
+        self.pot -= bet;
         self.hands.push(Hand::new(false, bet, card));
         Ok(())
     }
@@ -65,6 +66,10 @@ impl Player {
 
     pub fn still_playing(&self) -> bool {
         matches!(self.status, PlayerStatus::Playing)
+    }
+
+    pub fn check_hand_condition(&self, current_hand: usize) -> HandCondition {
+        self.hands[current_hand].check_hand()
     }
 
     fn check_condition(&mut self, current_hand: usize) -> &PlayerStatus {
@@ -110,6 +115,7 @@ impl Player {
                 let card = deck.deal_card();
                 println!("{} got the card {}", self.name, card);
                 self.add_card_to_hand(card, current_hand);
+                self.pot -= self.hands[current_hand].current_bet();
                 self.hands[current_hand].double_bet();
                 self.status = PlayerStatus::Standing;
             }

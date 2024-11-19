@@ -6,3 +6,7 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 strum = { version = "0.26", features = ["derive"] }
+
+[dev-dependencies]
+rstest = "0.23"
+pretty_assertions = "1.4"
