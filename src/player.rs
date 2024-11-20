@@ -7,6 +7,7 @@ use crate::{
     card::Card,
     deck::Deck,
     hand::{Hand, HandCondition},
+    printer::Printer,
 };
 
 #[derive(Debug)]
@@ -26,7 +27,7 @@ pub enum PlayerStatus {
 #[derive(Debug)]
 pub struct Player {
     pub name: String,
-    kind: PlayerKind,
+    pub kind: PlayerKind,
     pub pot: u32,
     status: PlayerStatus,
     pub hands: Vec<Hand>,
@@ -56,10 +57,15 @@ impl Player {
         self.hands[current_hand].add_card_to_hand(card);
     }
 
-    pub fn play(&mut self, current_hand: usize, deck: &mut Deck) -> Result<&PlayerStatus, String> {
+    pub fn play(
+        &mut self,
+        current_hand: usize,
+        deck: &mut Deck,
+        printer: &impl Printer,
+    ) -> Result<&PlayerStatus, String> {
         match self.kind {
-            PlayerKind::Dealer => self.dealer_play(deck)?,
-            PlayerKind::Player => self.player_play(current_hand, deck)?,
+            PlayerKind::Dealer => self.dealer_play(deck, printer)?,
+            PlayerKind::Player => self.player_play(current_hand, deck, printer)?,
         };
         Ok(self.check_condition(current_hand))
     }
@@ -98,6 +104,7 @@ impl Player {
         current_hand: usize,
         action: Action,
         deck: &mut Deck,
+        printer: &impl Printer,
     ) -> Result<(), String> {
         match action {
             Action::Hit => {
@@ -149,15 +156,20 @@ impl Player {
         Ok(())
     }
 
-    fn dealer_play(&mut self, deck: &mut Deck) -> Result<(), String> {
+    fn dealer_play(&mut self, deck: &mut Deck, printer: &impl Printer) -> Result<(), String> {
         match self.hands[0].sum_value() {
-            0..=16 => self.execute_action(0, Action::Hit, deck)?,
-            _ => self.execute_action(0, Action::Stand, deck)?,
+            0..=16 => self.execute_action(0, Action::Hit, deck, printer)?,
+            _ => self.execute_action(0, Action::Stand, deck, printer)?,
         };
         Ok(())
     }
 
-    fn player_play(&mut self, current_hand: usize, deck: &mut Deck) -> Result<(), String> {
+    fn player_play(
+        &mut self,
+        current_hand: usize,
+        deck: &mut Deck,
+        printer: &impl Printer,
+    ) -> Result<(), String> {
         let hand = &self.hands[current_hand];
         let hand_size = hand.size();
         let hands_count = self.hands.len();
@@ -193,7 +205,7 @@ impl Player {
         let input = input.trim();
 
         let action = Action::from_str(input)?;
-        self.execute_action(current_hand, action, deck)?;
+        self.execute_action(current_hand, action, deck, printer)?;
 
         println!("{}", "*".repeat(90));
 

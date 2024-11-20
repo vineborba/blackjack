@@ -2,20 +2,23 @@ use crate::{
     deck::Deck,
     hand::HandCondition,
     player::{Player, PlayerKind},
+    printer::{Generic, Message, Printer},
 };
 
 #[derive(Debug)]
-pub struct Game {
+pub struct Game<T: Printer> {
     number_of_rounds: u16,
     played_rounds: u16,
     players: Vec<Player>,
     dealer: Player,
     deck: Deck,
+    printer: T,
 }
 
-impl Game {
-    pub fn new(_number_of_rounds: u16) -> Self {
+impl<T: Printer> Game<T> {
+    pub fn new(_number_of_rounds: u16, printer: T) -> Self {
         Self {
+            printer,
             number_of_rounds: 1,
             played_rounds: 0,
             players: vec![],
@@ -26,7 +29,7 @@ impl Game {
 
     pub fn start(&mut self, players_count: u8) {
         while self.played_rounds < self.number_of_rounds {
-            self.setup_game(players_count);
+            self.setup_round(players_count);
             self.run_round().unwrap_or_else(|e| {
                 panic!("Failed to run round {}: {}", self.number_of_rounds + 1, e)
             });
@@ -34,7 +37,8 @@ impl Game {
         }
     }
 
-    fn setup_game(&mut self, players_count: u8) {
+    fn setup_round(&mut self, players_count: u8) {
+        self.printer.set_round_settings(self.played_rounds + 1);
         self.players = vec![];
         for i in 0..players_count {
             let mut player = Player::new(format!("Player {}", i + 1), 100, PlayerKind::Player);
@@ -51,9 +55,12 @@ impl Game {
     }
 
     fn run_round(&mut self) -> Result<(), String> {
-        println!("Starting now round {}!\n\n", self.played_rounds + 1);
+        self.printer
+            .print_message(Message::Generic(Generic::Starting), None);
 
-        println!("Shuffling deck...\n");
+        self.printer
+            .print_message(Message::Generic(Generic::Shuffling), None);
+
         self.deck.shuffle();
 
         for _ in 0..2 {
@@ -70,31 +77,26 @@ impl Game {
             };
             out += 1;
 
-            println!("{}", "*".repeat(90));
-            println!(
-                "The dealer has the following hand:\n{}",
-                self.dealer.hands[0]
-            );
-            println!("{}", "*".repeat(90));
+            self.printer
+                .print_message(Message::PlayerStatus, Some(&self.dealer));
 
             // PLAYERS ACTIONS
             for p in self.players.iter_mut().filter(|p| p.still_playing()) {
                 for current_hand in 0..p.hands.len() {
-                    p.play(current_hand, &mut self.deck)?;
+                    p.play(current_hand, &mut self.deck, &self.printer)?;
                 }
             }
 
             // DEALERS ACTIONS
             if self.dealer.still_playing() {
                 println!("The Dealer will play now");
-                self.dealer.play(0, &mut self.deck)?;
+                self.dealer.play(0, &mut self.deck, &self.printer)?;
             }
 
             if self.should_break_loop() {
                 break;
             }
         }
-        println!("Verifying results now");
         self.verify_results();
         Ok(())
     }
@@ -106,6 +108,9 @@ impl Game {
     }
 
     fn verify_results(&mut self) {
+        self.printer
+            .print_message(Message::Generic(Generic::VerifyResults), None);
+
         let dealer_hand = self.dealer.check_hand_condition(0);
         for p in self.players.iter_mut() {
             let single_hand = p.hands.len() == 1;
