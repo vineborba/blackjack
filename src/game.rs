@@ -107,13 +107,9 @@ impl Game {
 
     fn verify_results(&mut self) {
         let dealer_hand = self.dealer.check_hand_condition(0);
-        dbg!(&self.players);
         for p in self.players.iter_mut() {
-            dbg!(2);
             let single_hand = p.hands.len() == 1;
-            dbg!(3);
             for (i, h) in p.hands.iter().enumerate() {
-                dbg!(4);
                 let player_hand = h.check_hand();
                 if single_hand {
                     println!("Comparing {}'s hand with the Dealers'", p.name);
