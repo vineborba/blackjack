@@ -48,7 +48,7 @@ impl Player {
             return Err(format!("{} is betting more than owned pot!", self.name));
         }
         self.pot -= bet;
-        self.hands.push(Hand::new(false, bet, card));
+        self.hands.push(Hand::new(bet, card));
         Ok(())
     }
 

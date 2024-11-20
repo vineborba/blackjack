@@ -5,8 +5,6 @@ use crate::card::Card;
 #[derive(Debug)]
 pub struct Hand {
     cards: Vec<Card>,
-    #[allow(unused)]
-    splitted: bool,
     bet: u32,
 }
 
@@ -17,16 +15,12 @@ pub enum HandCondition {
 }
 
 impl Hand {
-    pub fn new(splitted: bool, bet: u32, first_card: Option<Card>) -> Self {
+    pub fn new(bet: u32, first_card: Option<Card>) -> Self {
         let mut cards = vec![];
         if let Some(card) = first_card {
             cards.push(card);
         }
-        Self {
-            bet,
-            splitted,
-            cards,
-        }
+        Self { bet, cards }
     }
 
     pub fn add_card_to_hand(&mut self, card: Card) {

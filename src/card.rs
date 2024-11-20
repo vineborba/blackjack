@@ -83,7 +83,6 @@ impl fmt::Display for Figure {
 
 #[derive(Debug, Clone)]
 pub struct Card {
-    #[allow(unused)]
     suit: Suit,
     figure: Figure,
 }
